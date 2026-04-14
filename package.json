@@ -1,6 +1,6 @@
 {
   "name": "reo-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "AI-powered terminal coding assistant",
   "author": "Mohamed Reda Chakir",
