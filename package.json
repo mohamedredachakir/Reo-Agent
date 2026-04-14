@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "AI-powered terminal coding assistant",
+  "author": "Mohamed Reda Chakir",
   "bin": {
     "reo": "./src/main.tsx"
   },
