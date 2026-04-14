@@ -2,6 +2,11 @@
 
 AI-powered terminal coding assistant built with TypeScript.
 
+## Table of Contents
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+
 ## Features
 
 - **Interactive REPL** - Chat with Reo directly in your terminal
