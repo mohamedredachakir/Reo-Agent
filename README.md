@@ -124,3 +124,6 @@ bun run build:prod
 
 MIT
 # Reo-Agent
+
+## Contact
+Reach out to the maintainers for any queries.
