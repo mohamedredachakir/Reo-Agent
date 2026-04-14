@@ -1,4 +1,4 @@
-# Reo Agent CLI
+# Reo Agent CLI CLI
 
 AI-powered terminal coding assistant built with TypeScript.
 
