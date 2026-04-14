@@ -1,6 +1,4 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
-## [Unreleased]
-- Initial release setup operations.
+## [1.0.0] - 2026-04-14
+- Initial formal release with completed docs.
