@@ -4,6 +4,7 @@
   "type": "module",
   "description": "AI-powered terminal coding assistant",
   "author": "Mohamed Reda Chakir",
+  "keywords": ["ai", "cli", "agent", "typescript"],
   "bin": {
     "reo": "./src/main.tsx"
   },
