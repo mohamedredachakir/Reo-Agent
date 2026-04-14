@@ -1,3 +1,2 @@
 # Contributors
-
 - Mohamed Reda Chakir
