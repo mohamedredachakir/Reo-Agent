@@ -2,16 +2,6 @@
 
 AI-powered terminal coding assistant built with TypeScript.
 
-## Project Status
-
-Stabilized core release: typecheck, lint, tests, build, and production build pass on current main branch. The project is functional for day-to-day use, with remaining improvements focused on broader integration coverage.
-
-## Table of Contents
-
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-
 ## Features
 
 - **Interactive REPL** - Chat with Reo directly in your terminal
@@ -52,7 +42,6 @@ temperature: 0.7
 ```
 
 Or set the environment variable:
-
 ```bash
 export ANTHROPIC_API_KEY=your-api-key
 ```
@@ -72,26 +61,26 @@ reo --help
 
 ## Available Tools
 
-| Tool        | Description                        |
-| ----------- | ---------------------------------- |
-| `read`      | Read file contents                 |
-| `write`     | Write content to files             |
-| `edit`      | Edit files with string replacement |
-| `bash`      | Execute shell commands             |
-| `glob`      | Find files matching patterns       |
-| `grep`      | Search file contents               |
-| `web_fetch` | Fetch URLs                         |
+| Tool | Description |
+|------|-------------|
+| `read` | Read file contents |
+| `write` | Write content to files |
+| `edit` | Edit files with string replacement |
+| `bash` | Execute shell commands |
+| `glob` | Find files matching patterns |
+| `grep` | Search file contents |
+| `web_fetch` | Fetch URLs |
 
 ## Slash Commands
 
-| Command                 | Description               |
-| ----------------------- | ------------------------- |
-| `/help`                 | Show help information     |
-| `/version`              | Show version              |
-| `/config [key] [value]` | View or set config        |
-| `/doctor`               | Check system requirements |
-| `/clear`                | Clear conversation        |
-| `/cost`                 | Show API costs            |
+| Command | Description |
+|---------|-------------|
+| `/help` | Show help information |
+| `/version` | Show version |
+| `/config [key] [value]` | View or set config |
+| `/doctor` | Check system requirements |
+| `/clear` | Clear conversation |
+| `/cost` | Show API costs |
 
 ## Architecture
 
@@ -126,20 +115,7 @@ bun run lint
 bun run build:prod
 ```
 
-## Validation
-
-```bash
-bun run typecheck
-bun run lint
-bun test
-bun run build
-bun run build:prod
-```
-
 ## License
 
 MIT
-
-## Contact
-
-Reach out to the maintainers for any queries.
+# Reo-Agent

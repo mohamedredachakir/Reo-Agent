@@ -1,0 +1,88 @@
+REO AGENT - PROJECT CONTEXT SNAPSHOT
+Date: 21 April 2026
+
+1) PROJECT IDENTITY
+- Name: reo-agent
+- Version: 0.1.2
+- Stack: TypeScript + Bun + Ink + Anthropic SDK
+- Goal: AI-powered terminal coding assistant for developer workflows
+
+2) WHY THIS PROJECT EXISTS
+- To let developers work with an AI assistant directly from terminal
+- To combine chat + file editing + shell commands + code search in one CLI
+- To support extensible tools and future multi-agent workflows
+
+3) WHAT IS ALREADY IMPLEMENTED
+- Interactive CLI loop and slash-command handling
+- Query engine integration with tool-calling loop
+- Tool system with file read/write/edit, bash, grep, glob, web fetch
+- Command registry with help/version/clear/doctor/config/cost
+- Basic state/config/coordinator modules
+- Build, typecheck, lint scripts in package configuration
+
+4) CURRENT REAL STATUS
+- Status: MVP+ / Stabilized Core
+- Core pipeline now passes: typecheck, lint, tests, build
+- Not fully production-ready yet (remaining scope: docs depth + broader tests)
+
+5) COMPLETED BLOCKER
+- TypeScript failure in src/main.tsx (octal ANSI escapes) is fixed
+- ANSI escapes were migrated to hex form (\x1b)
+- Typecheck now passes
+
+6) KNOWN INCOMPLETE AREAS
+- Overlap/duplication risk across some tool implementations
+- Docs in docs folder are still minimal and need expansion
+- Test coverage exists now but remains basic; needs broader integration depth
+
+7) FINISH CHECKLIST (HIGH PRIORITY ORDER)
+A. Stability and compile health
+- Fix src/main.tsx ANSI escapes
+- Run typecheck again
+- Resolve any additional surfaced type errors
+
+B. Core product completeness
+- Make config updates persist through slash commands
+- Implement real token/cost tracking in cost command
+- Ensure CLI options affect runtime behavior as documented
+
+C. Reliability and release engineering
+- Add unit tests for query engine, tools, command parsing
+- Add integration tests for CLI flows and streaming behavior
+- Add CI checks: typecheck, lint, build, tests
+
+D. Documentation readiness
+- Expand docs/architecture.md with real architecture details
+- Expand docs/index.md with setup, usage, troubleshooting
+- Sync README claims with actual implementation state
+
+8) DEFINITION OF DONE (PROJECT FINISHED)
+Project can be marked finished only when all are true:
+- typecheck passes
+- lint passes
+- build and production build pass
+- no placeholder behavior for critical commands (config, cost)
+- CLI options behave exactly as documented
+- tests exist and pass in CI
+- documentation reflects real behavior and limits
+
+9) QUICK RESUME PLAN (WHEN RETURNING LATER)
+Step 1: Expand architecture and usage docs
+Step 2: Add deeper integration tests (tool calls, streaming, error paths)
+Step 3: Remove tool overlap and tighten internal abstractions
+Step 4: Verify final release checklist and package publication readiness
+
+10) REFERENCE FILES
+- README.md
+- description.md
+- todo.md
+- src/main.tsx
+- src/QueryEngine.ts
+- src/commands/index.ts
+- src/tools/FileTools.ts
+- src/tools/BashTools.ts
+- src/config/index.ts
+- docs/architecture.md
+- docs/index.md
+
+This file is intended as the persistent context snapshot to reopen and continue project finishing work quickly.
