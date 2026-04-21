@@ -1,145 +1,106 @@
-# Reo Agent CLI
+# Reo Agent 🤖
 
-AI-powered terminal coding assistant built with TypeScript.
+**Reo Agent** is a professional-grade, AI-powered terminal coding assistant built with TypeScript and Bun. It empowers developers to interact with their codebase using natural language across multiple AI providers and local models.
 
-## Project Status
+---
 
-Stabilized core release: typecheck, lint, tests, build, and production build pass on current main branch. The project is functional for day-to-day use, with remaining improvements focused on broader integration coverage.
+## 🚀 Key Features
 
-## Table of Contents
+- **Multi-Provider Hub**: Support for **Anthropic**, **OpenAI**, and **Google AI Studio (Gemini)**.
+- **Local Performance**: Run private models locally via **Ollama** and **Docker**.
+- **Autonomous Tools**: AI can read/edit files, run shell commands, and search code.
+- **High Performance**: Built on **Bun** for blazing-fast execution and low latency.
+- **Interactive REPL**: A beautiful, terminal-based chat interface with streaming support.
 
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
+---
 
-## Features
+## 🛠️ Step-by-Step Setup
 
-- **Interactive REPL** - Chat with Reo directly in your terminal
-- **File Operations** - Read, write, and edit files with natural language
-- **Shell Commands** - Execute bash commands and see results
-- **Code Search** - Search files with grep and glob patterns
-- **Streaming Responses** - See Reo's responses as they're generated
-- **Slash Commands** - `/help`, `/config`, `/doctor`, `/version`
-- **Tool System** - Extensible tool architecture
-- **Multi-Agent Support** - Coordinate multiple AI agents for complex tasks
-
-## Installation
+### 1. Installation
+Clone the repository and install dependencies using Bun:
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/reo-agent.git
+git clone https://github.com/mohamedredachakir/Reo-Agent.git
 cd reo-agent
-
-# Install dependencies
 bun install
-
-# Build
-bun run build
-
-# Link for global use
-bun link
 ```
 
-## Configuration
+### 2. Configure Your AI Provider
+You can set up your preferred AI provider in two ways:
 
+#### Option A: Environment Variables (Quickest)
+```bash
+export ANTHROPIC_API_KEY="your-key"
+# OR
+export OPENAI_API_KEY="your-key"
+# OR
+export GOOGLE_API_KEY="your-key"
+```
+
+#### Option B: Configuration File
 Create `~/.config/reo-agent/config.yaml`:
-
 ```yaml
-apiKey: your-anthropic-api-key
-model: claude-sonnet-4-20250514
-maxTokens: 8192
-temperature: 0.7
+provider: google # anthropic, openai, google, or ollama
+apiKey: your-primary-key
+googleApiKey: your-google-key
+model: gemini-1.5-flash
 ```
 
-Or set the environment variable:
+### 3. Running Local Models (Ollama)
+If you prefer running models locally for privacy and no cost:
 
+1. **Start Ollama with Docker**:
+   ```bash
+   docker-compose up -d ollama
+   ```
+2. **Setup your model**:
+   ```bash
+   ./scripts/setup-ollama.sh
+   ```
+
+---
+
+## 💻 Usage
+
+### Start Interactive Chat
 ```bash
-export ANTHROPIC_API_KEY=your-api-key
-```
-
-## Usage
-
-```bash
-# Start interactive mode
+# Start with your default provider
 reo
 
-# Send initial message
-reo -m "Explain this code"
-
-# Show help
-reo --help
+# Start with a specific provider and model
+reo --provider google --model gemini-1.5-flash
+reo --provider ollama --model llama3
 ```
 
-## Available Tools
-
-| Tool        | Description                        |
-| ----------- | ---------------------------------- |
-| `read`      | Read file contents                 |
-| `write`     | Write content to files             |
-| `edit`      | Edit files with string replacement |
-| `bash`      | Execute shell commands             |
-| `glob`      | Find files matching patterns       |
-| `grep`      | Search file contents               |
-| `web_fetch` | Fetch URLs                         |
-
-## Slash Commands
-
-| Command                 | Description               |
-| ----------------------- | ------------------------- |
-| `/help`                 | Show help information     |
-| `/version`              | Show version              |
-| `/config [key] [value]` | View or set config        |
-| `/doctor`               | Check system requirements |
-| `/clear`                | Clear conversation        |
-| `/cost`                 | Show API costs            |
-
-## Architecture
-
-```
-src/
-├── main.tsx         # CLI entry point
-├── App.tsx         # Main React app
-├── QueryEngine.ts  # LLM API client
-├── Tool.ts         # Base tool class
-├── tools/          # Tool implementations
-├── commands/       # Slash commands
-├── components/     # React/Ink UI components
-├── config/         # Configuration management
-├── state/          # State management
-├── coordinator/    # Multi-agent coordination
-└── utils/          # Utility functions
+### One-Off Tasks
+```bash
+reo -m "Write a unit test for the QueryEngine class"
 ```
 
-## Development
+### In-Chat Commands
+While chatting with Reo, you can use **Slash Commands**:
+- `/help`: See all available tools and commands.
+- `/config`: Change settings on the fly.
+- `/doctor`: Run a diagnostic check on your environment.
+- `/clear`: Clear the chat history.
+
+---
+
+## 🧪 Development & Quality
+
+Ensure the project is running perfectly on your machine:
 
 ```bash
-# Run in development
-bun run dev
-
-# Type check
-bun run typecheck
-
-# Lint
-bun run lint
-
-# Build for production
-bun run build:prod
+bun run typecheck   # Validate TypeScript types
+bun run lint        # Check code style
+bun test            # Run internal tests
+bun run build       # Verify production build
 ```
 
-## Validation
+---
 
-```bash
-bun run typecheck
-bun run lint
-bun test
-bun run build
-bun run build:prod
-```
+## 📄 License
+This project is licensed under the MIT License.
 
-## License
-
-MIT
-
-## Contact
-
-Reach out to the maintainers for any queries.
+## 🤝 Contributing
+Contributions are welcome! Please feel free to submit a Pull Request.

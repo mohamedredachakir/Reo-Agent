@@ -3,6 +3,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Anthropic } from '@anthropic-ai/sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages/messages';
+import { OpenAI } from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as yaml from 'yaml';
 import type { Tool } from './Tool.js';
 
@@ -22,7 +24,11 @@ type ReoUsage = {
 };
 
 export interface ReoConfig {
+	provider: 'anthropic' | 'openai' | 'google' | 'ollama';
 	apiKey?: string;
+	openaiApiKey?: string;
+	googleApiKey?: string;
+	ollamaBaseUrl?: string;
 	model: string;
 	maxTokens: number;
 	temperature: number;
@@ -56,7 +62,9 @@ export interface UsageStats {
 }
 
 export class QueryEngine extends EventEmitter {
-	private client: Anthropic;
+	private anthropicClient?: Anthropic;
+	private openaiClient?: OpenAI;
+	private googleClient?: GoogleGenerativeAI;
 	private config: ReoConfig;
 	private messageHistory: ReoMessage[] = [];
 	private toolCallHistory: ToolCallResult[] = [];
@@ -71,13 +79,35 @@ export class QueryEngine extends EventEmitter {
 	constructor(config: Partial<ReoConfig> = {}) {
 		super();
 		this.config = this.loadConfig(config);
-		this.client = new Anthropic({
-			apiKey: this.config.apiKey || process.env.ANTHROPIC_API_KEY,
-		});
+		this.initializeClients();
+	}
+
+	private initializeClients() {
+		const { provider, apiKey, openaiApiKey, googleApiKey, ollamaBaseUrl } = this.config;
+
+		if (provider === 'anthropic') {
+			this.anthropicClient = new Anthropic({
+				apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
+			});
+		} else if (provider === 'openai') {
+			this.openaiClient = new OpenAI({
+				apiKey: openaiApiKey || process.env.OPENAI_API_KEY || apiKey,
+			});
+		} else if (provider === 'google') {
+			this.googleClient = new GoogleGenerativeAI(
+				googleApiKey || process.env.GOOGLE_API_KEY || apiKey || '',
+			);
+		} else if (provider === 'ollama') {
+			this.openaiClient = new OpenAI({
+				baseURL: `${ollamaBaseUrl}/v1`,
+				apiKey: 'ollama', // Ollama doesn't need a real key but OpenAI client requires one
+			});
+		}
 	}
 
 	private loadConfig(overrides: Partial<ReoConfig>): ReoConfig {
 		const defaultConfig: ReoConfig = {
+			provider: 'anthropic',
 			model: 'claude-sonnet-4-20250514',
 			maxTokens: 8192,
 			temperature: 0.7,
@@ -96,7 +126,16 @@ export class QueryEngine extends EventEmitter {
 			}
 		}
 
-		return { ...defaultConfig, ...fileConfig, ...overrides };
+		const config = { ...defaultConfig, ...fileConfig, ...overrides };
+
+		// Set default model based on provider if not explicitly set in fileConfig or overrides
+		if (!fileConfig.model && !overrides.model) {
+			if (config.provider === 'openai') config.model = 'gpt-4o';
+			else if (config.provider === 'google') config.model = 'gemini-1.5-flash';
+			else if (config.provider === 'ollama') config.model = 'llama3';
+		}
+
+		return config;
 	}
 
 	async query(userMessage: string, options: QueryOptions = {}): Promise<string> {
@@ -154,13 +193,33 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 		tools: Tool[],
 		options: QueryOptions,
 	): Promise<ReoContentBlock[]> {
+		const provider = this.config.provider;
+
+		if (provider === 'anthropic') {
+			return this.executeAnthropicRound(systemPrompt, tools, options);
+		} else if (provider === 'openai' || provider === 'ollama') {
+			return this.executeOpenAIRound(systemPrompt, tools, options);
+		} else if (provider === 'google') {
+			return this.executeGoogleRound(systemPrompt, tools, options);
+		}
+
+		throw new Error(`Unsupported provider: ${provider}`);
+	}
+
+	private async executeAnthropicRound(
+		systemPrompt: string,
+		tools: Tool[],
+		options: QueryOptions,
+	): Promise<ReoContentBlock[]> {
+		if (!this.anthropicClient) throw new Error('Anthropic client not initialized');
+
 		const toolSchemas = tools.map((t) => t.getSchema());
 		const messages = this.messageHistory.map((m) => ({
 			role: m.role,
 			content: m.content,
 		}));
 
-		const response = await this.client.messages.create({
+		const response = await this.anthropicClient.messages.create({
 			model: this.config.model,
 			max_tokens: options.maxTokens || this.config.maxTokens,
 			temperature: options.temperature ?? this.config.temperature,
@@ -173,6 +232,203 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 		this.recordUsage(responseWithUsage.usage);
 
 		return response.content as ReoContentBlock[];
+	}
+
+	private async executeOpenAIRound(
+		systemPrompt: string,
+		tools: Tool[],
+		options: QueryOptions,
+	): Promise<ReoContentBlock[]> {
+		if (!this.openaiClient) throw new Error('OpenAI client not initialized');
+
+		const toolSchemas = tools.map((t) => ({
+			type: 'function',
+			function: {
+				name: t.name,
+				description: t.description,
+				parameters: t.getSchema().input_schema,
+			},
+		}));
+
+		const messages: any[] = [{ role: 'system', content: systemPrompt }];
+
+		for (const m of this.messageHistory) {
+			if (m.role === 'assistant') {
+				// Search for tool calls in the content
+				const contentBlocks = Array.isArray(m.content) ? m.content : [{ type: 'text', text: m.content }];
+				const text = contentBlocks
+					.filter((b: any) => b.type === 'text')
+					.map((b: any) => b.text)
+					.join('\n');
+				const tool_calls = contentBlocks
+					.filter((b: any) => b.type === 'tool_use')
+					.map((b: any) => ({
+						id: b.id,
+						type: 'function',
+						function: {
+							name: b.name,
+							arguments: JSON.stringify(b.input),
+						},
+					}));
+
+				messages.push({
+					role: 'assistant',
+					content: text || null,
+					tool_calls: tool_calls.length > 0 ? tool_calls : undefined,
+				});
+			} else if (m.role === 'user') {
+				if (Array.isArray(m.content)) {
+					const toolResults = m.content.filter((c: any) => c.type === 'tool_result');
+					if (toolResults.length > 0) {
+						for (const result of toolResults) {
+							messages.push({
+								role: 'tool',
+								tool_call_id: (result as any).tool_use_id,
+								content: (result as any).content,
+							});
+						}
+					} else {
+						const text = m.content
+							.filter((c: any) => c.type === 'text')
+							.map((c: any) => c.text)
+							.join('\n');
+						messages.push({ role: 'user', content: text });
+					}
+				} else {
+					messages.push({ role: 'user', content: m.content });
+				}
+			}
+		}
+
+		const response = await this.openaiClient.chat.completions.create({
+			model: this.config.model,
+			max_tokens: options.maxTokens || this.config.maxTokens,
+			temperature: options.temperature ?? this.config.temperature,
+			messages,
+			tools: toolSchemas.length > 0 ? (toolSchemas as any) : undefined,
+		});
+
+		this.recordUsage({
+			input_tokens: response.usage?.prompt_tokens,
+			output_tokens: response.usage?.completion_tokens,
+		});
+
+		const message = response.choices[0].message;
+		const content: ReoContentBlock[] = [];
+
+		if (message.content) {
+			content.push({ type: 'text', text: message.content });
+		}
+
+		if (message.tool_calls) {
+			for (const call of message.tool_calls) {
+				if (call.type === 'function') {
+					content.push({
+						type: 'tool_use',
+						id: call.id,
+						name: call.function.name,
+						input: JSON.parse(call.function.arguments),
+					});
+				}
+			}
+		}
+
+		return content;
+	}
+
+	private async executeGoogleRound(
+		systemPrompt: string,
+		tools: Tool[],
+		options: QueryOptions,
+	): Promise<ReoContentBlock[]> {
+		if (!this.googleClient) throw new Error('Google client not initialized');
+
+		const model = this.googleClient.getGenerativeModel({
+			model: this.config.model,
+			systemInstruction: systemPrompt,
+		});
+
+		const toolSchemas = tools.map((t) => ({
+			functionDeclarations: [
+				{
+					name: t.name,
+					description: t.description,
+					parameters: t.getSchema().input_schema,
+				},
+			],
+		}));
+
+		const history = [];
+		for (let i = 0; i < this.messageHistory.length - 1; i++) {
+			const m = this.messageHistory[i];
+			const role = m.role === 'user' ? 'user' : 'model';
+			const parts: any[] = [];
+
+			if (Array.isArray(m.content)) {
+				for (const block of m.content as any[]) {
+					if (block.type === 'text') {
+						parts.push({ text: block.text });
+					} else if (block.type === 'tool_use') {
+						parts.push({
+							functionCall: {
+								name: block.name,
+								args: block.input,
+							},
+						});
+					} else if (block.type === 'tool_result') {
+						parts.push({
+							functionResponse: {
+								name: block.name || '',
+								response: { content: block.content },
+							},
+						});
+					}
+				}
+			} else {
+				parts.push({ text: m.content });
+			}
+			history.push({ role, parts });
+		}
+
+		const chat = model.startChat({
+			history,
+			tools: toolSchemas.length > 0 ? (toolSchemas as any) : undefined,
+		});
+
+		const lastMessage = this.messageHistory[this.messageHistory.length - 1].content;
+		const result = await chat.sendMessage(
+			typeof lastMessage === 'string' ? lastMessage : JSON.stringify(lastMessage),
+		);
+		const response = result.response;
+
+		const content: ReoContentBlock[] = [];
+		let text = '';
+		try {
+			text = response.text();
+		} catch (e) {
+			console.error('Error getting text from Google response:', e);
+			text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+		}
+
+		if (text) {
+			content.push({ type: 'text', text });
+		}
+
+		const functionCalls = response.candidates?.[0]?.content?.parts?.filter((p) => p.functionCall);
+		if (functionCalls) {
+			for (const part of functionCalls) {
+				if (part.functionCall) {
+					content.push({
+						type: 'tool_use',
+						id: `call_${Date.now()}_${Math.random()}`,
+						name: part.functionCall.name,
+						input: part.functionCall.args as any,
+					});
+				}
+			}
+		}
+
+		return content;
 	}
 
 	private recordUsage(usage?: ReoUsage): void {
@@ -228,6 +484,7 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 					results.push({
 						type: 'tool_result',
 						tool_use_id: toolUse.id,
+						name: toolName,
 						content: typeof output === 'string' ? output : JSON.stringify(output, null, 2),
 					});
 				} catch (error) {
@@ -244,6 +501,7 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 					results.push({
 						type: 'tool_result',
 						tool_use_id: toolUse.id,
+						name: toolName,
 						content: `Error: ${errorMessage}`,
 					});
 				}
@@ -291,10 +549,32 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 
 		const systemPrompt = options.systemPrompt || this.getDefaultSystemPrompt();
 		const tools = options.tools || [];
+		const provider = this.config.provider;
 
-		this.currentIteration = 0;
+		if (provider === 'anthropic') {
+			yield* this.streamAnthropic(systemPrompt, tools, options);
+		} else if (provider === 'openai' || provider === 'ollama') {
+			yield* this.streamOpenAI(systemPrompt, tools, options);
+		} else {
+			// Fallback to non-streaming for others
+			const response = await this.executeRound(systemPrompt, tools, options);
+			const text = this.extractTextContent(response);
+			this.messageHistory.push({
+				role: 'assistant',
+				content: text,
+			});
+			yield text;
+		}
+	}
 
-		const stream = await this.client.messages.stream({
+	private async *streamAnthropic(
+		systemPrompt: string,
+		tools: Tool[],
+		options: QueryOptions,
+	): AsyncGenerator<string> {
+		if (!this.anthropicClient) throw new Error('Anthropic client not initialized');
+
+		const stream = await this.anthropicClient.messages.stream({
 			model: this.config.model,
 			max_tokens: options.maxTokens || this.config.maxTokens,
 			temperature: options.temperature ?? this.config.temperature,
@@ -311,7 +591,7 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 		let latestOutputTokens = 0;
 
 		for await (const event of stream) {
-			const eventWithUsage = event as typeof event & { usage?: ReoUsage };
+			const eventWithUsage = event as any;
 			if (eventWithUsage.usage?.input_tokens) {
 				latestInputTokens = Number(eventWithUsage.usage.input_tokens) || latestInputTokens;
 			}
@@ -323,8 +603,6 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 				if (event.delta.type === 'text_delta') {
 					fullResponse += event.delta.text;
 					yield event.delta.text;
-				} else if (event.delta.type === 'input_json_delta') {
-					yield event.delta.partial_json;
 				}
 			}
 		}
@@ -339,6 +617,46 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 			this.usageStats.outputTokens += latestOutputTokens;
 			this.usageStats.apiCalls += 1;
 		}
+	}
+
+	private async *streamOpenAI(
+		systemPrompt: string,
+		tools: Tool[],
+		options: QueryOptions,
+	): AsyncGenerator<string> {
+		if (!this.openaiClient) throw new Error('OpenAI client not initialized');
+
+		const messages: any[] = [
+			{ role: 'system', content: systemPrompt },
+			...this.messageHistory.map((m) => ({
+				role: m.role,
+				content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+			})),
+		];
+
+		const stream = await this.openaiClient.chat.completions.create({
+			model: this.config.model,
+			max_tokens: options.maxTokens || this.config.maxTokens,
+			temperature: options.temperature ?? this.config.temperature,
+			messages,
+			stream: true,
+		});
+
+		let fullResponse = '';
+		for await (const chunk of stream) {
+			const content = chunk.choices[0]?.delta?.content || '';
+			if (content) {
+				fullResponse += content;
+				yield content;
+			}
+		}
+
+		this.messageHistory.push({
+			role: 'assistant',
+			content: fullResponse,
+		});
+
+		this.usageStats.apiCalls += 1;
 	}
 }
 

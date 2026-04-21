@@ -1,0 +1,27 @@
+
+ ╔═════════════════════════════════════════════════════════════════════════════╗
+ ║                                                                             ║
+ ║   ██████╗ ███████╗ ██████╗      █████╗  ██████╗ ███████╗███╗   ██╗████████╗ ║
+ ║   ██╔══██╗██╔════╝██╔═══██╗    ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝ ║
+ ║   ██████╔╝█████╗  ██║   ██║    ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║    ║
+ ║   ██╔══██╗██╔════╝██║   ██║    ██╔══██║██║   ██║██╔════╝██║╚██╗██║   ██║    ║
+ ║   ██║  ██║███████╗╚██████╔╝    ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║    ║
+ ║   ╚═╝  ╚═╝╚══════╝ ╚═════╝     ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝    ║
+ ║                                                                             ║
+ ╠═════════════════════════════════════════════════════════════════════════════╣
+ ║                                                                             ║
+ ║   > VERSION : v0.1.2                                                   ║
+ ║   > ENGINE  : AI-POWERED TERMINAL CODING ASSISTANT                          ║
+ ║   > STATUS  : SYSTEM READY / NEURAL LINK ACTIVE                             ║
+ ║                                                                             ║
+ ╚═════════════════════════════════════════════════════════════════════════════╝
+
+[32mreo[0m: Hello! I am Reo, your AI coding assistant.
+       Type /help for commands, or just ask me anything.
+
+
+[32mreo[0m: 
+[31mError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent: [404 Not Found] models/gemini-1.5-flash-latest is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.[0m
+
+
+[36myou[0m: 

@@ -4,7 +4,11 @@ import * as yaml from 'yaml';
 import { z } from 'zod';
 
 export const ConfigSchema = z.object({
-	apiKey: z.string().optional(),
+	provider: z.enum(['anthropic', 'openai', 'google', 'ollama']).default('anthropic'),
+	apiKey: z.string().optional(), // Default for Anthropic or generic
+	openaiApiKey: z.string().optional(),
+	googleApiKey: z.string().optional(),
+	ollamaBaseUrl: z.string().default('http://localhost:11434'),
 	model: z.string().default('claude-sonnet-4-20250514'),
 	maxTokens: z.number().default(8192),
 	temperature: z.number().min(0).max(2).default(0.7),
@@ -60,6 +64,8 @@ export class ConfigManager {
 
 	private getDefaultConfig(): Config {
 		return {
+			provider: 'anthropic',
+			ollamaBaseUrl: 'http://localhost:11434',
 			model: 'claude-sonnet-4-20250514',
 			maxTokens: 8192,
 			temperature: 0.7,

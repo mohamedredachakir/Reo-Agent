@@ -1,130 +1,119 @@
 # Reo Agent User Guide
 
-## 1. What this project is
+## 1. Overview
 
-Reo Agent is an AI-powered terminal coding assistant built with TypeScript and Bun.
-It lets you chat in terminal and use built-in tools for:
+Reo Agent is an advanced AI-powered terminal coding assistant built with TypeScript and Bun. It provides a seamless interactive experience for developers, allowing you to manage your codebase through natural language.
 
-- Reading and editing files
-- Running shell commands
-- Searching code with glob and grep
-- Running slash commands like /help, /config, /doctor, /cost
+Key capabilities:
+- **Multi-Provider Support**: Switch between Anthropic, OpenAI, and Google AI Studio.
+- **Local Models**: Run private models locally via Ollama and Docker.
+- **File Operations**: Read, write, and edit files using AI-driven tool calls.
+- **Shell Integration**: Execute bash commands directly from the chat.
+- **Code Intelligence**: Search your project using advanced glob and grep patterns.
 
 ## 2. Requirements
 
-Before running, install:
+- **Bun**: Latest stable version.
+- **Docker & Docker Compose**: (Optional) Required for running local models via Ollama.
+- **API Keys**: At least one key from Anthropic, OpenAI, or Google AI Studio.
 
-- Bun (latest stable)
-- Node.js (recommended for compatibility checks)
-- An Anthropic API key
-
-## 3. Install and run
+## 3. Installation
 
 From the project root:
 
-1. Install dependencies
-   bun install
+```bash
+# Install dependencies
+bun install
 
-2. Build project
-   bun run build
+# Build the project
+bun run build
 
-3. Start in development mode
-   bun run dev
+# Start in development mode
+bun run dev
+```
 
-4. Or run directly
-   bun run src/main.tsx
+## 4. Configuring AI Providers
 
-5. Optional: build production bundle
-   bun run build:prod
+Reo Agent supports multiple providers. You can configure them via environment variables or a configuration file.
 
-## 4. Configure API key
+### Option A: Environment Variables
 
-You can configure your key in either way:
+```bash
+export ANTHROPIC_API_KEY=your_key
+export OPENAI_API_KEY=your_key
+export GOOGLE_API_KEY=your_key
+```
 
-Option A: environment variable
-export ANTHROPIC_API_KEY=your_api_key_here
+### Option B: Configuration File
+Create or edit `~/.config/reo-agent/config.yaml`:
 
-Option B: config file
-Create this file:
-~/.config/reo-agent/config.yaml
-
-Example content:
-apiKey: your_api_key_here
-model: claude-sonnet-4-20250514
+```yaml
+provider: google # Options: anthropic, openai, google, ollama
+model: gemini-1.5-flash # Optional: defaults are set per provider
+apiKey: your_primary_key
+openaiApiKey: your_openai_key
+googleApiKey: your_google_key
+ollamaBaseUrl: http://localhost:11434
 maxTokens: 8192
 temperature: 0.7
+```
 
-## 5. Basic usage
+## 5. Using Local Models (Ollama)
 
-Start interactive chat:
+Reo Agent is Docker-ready for local model execution, ensuring privacy and performance.
+
+1. **Start the Ollama container**:
+   ```bash
+   docker-compose up -d ollama
+   ```
+
+2. **Pull a model** (e.g., llama3):
+   ```bash
+   ./scripts/setup-ollama.sh
+   ```
+
+3. **Run Reo with Ollama**:
+   ```bash
+   reo --provider ollama --model llama3
+   ```
+
+## 6. CLI Usage & Commands
+
+### Interactive Mode
+```bash
+# Default (uses config or Anthropic)
 reo
-or
-bun run src/main.tsx
 
-Send one initial message:
-bun run src/main.tsx -m "Explain this repository structure"
+# Specific Provider
+reo --provider google --model gemini-1.5-flash
+reo --provider openai --model gpt-4o
+```
 
-Show options:
-bun run src/main.tsx --help
+### Direct Message
+```bash
+reo -m "Refactor the authentication logic in src/auth.ts"
+```
 
-## 6. Useful slash commands
+### Slash Commands (Inside Chat)
+- `/help`: List all available commands.
+- `/config`: View or update settings (e.g., `/config temperature 0.5`).
+- `/doctor`: Check system health and API connectivity.
+- `/cost`: View token usage and estimated session costs.
+- `/clear`: Reset the current conversation history.
 
-- /help : show available commands
-- /version : show current version
-- /config : show current config
-- /config temperature 0.5 : update a config value and persist it
-- /doctor : check environment health
-- /cost : show session token usage and estimated cost
-- /clear : clear conversation in current session
+## 7. Development & Health Checks
 
-## 7. Validation commands
+Keep your Reo instance healthy by running these commands:
 
-Run all quality checks:
+```bash
+bun run typecheck   # Check for TypeScript errors
+bun run lint        # Ensure code style consistency
+bun test            # Run the test suite
+bun run build       # Verify the build process
+```
 
-bun run typecheck
-bun run lint
-bun test
-bun run build
-bun run build:prod
+## 8. Troubleshooting
 
-If all pass, the project is healthy.
-
-## 8. What to add for complete work
-
-The project is stable now, but to make it fully complete for long-term production use, add:
-
-1. More integration tests
-
-- Full CLI workflows
-- Streaming and non-streaming behavior
-- Error path and tool failure scenarios
-
-2. Stronger error UX
-
-- More actionable user-facing error messages
-- Standardized exit codes for common failures
-
-3. Release workflow
-
-- Versioning and changelog automation
-- Optional publish pipeline and release notes process
-
-4. Security hardening
-
-- Add secret scanning in CI
-- Add dependency vulnerability checks in CI
-
-5. User documentation upgrades
-
-- Troubleshooting section with common failure examples
-- Real-world command recipes for daily use
-
-## 9. Quick success checklist
-
-A user setup is complete when:
-
-- API key is set
-- bun run dev starts successfully
-- /doctor reports healthy environment
-- /config updates persist after restart
-- typecheck, lint, test, and build all pass
+- **API Errors**: Ensure your keys are correctly set in the environment or `config.yaml`. Use `/doctor` to diagnose connection issues.
+- **Ollama Connection**: If using Docker, ensure port `11434` is not blocked and the container is running (`docker ps`).
+- **Model Not Found**: For Ollama, ensure you have pulled the model using `ollama pull [model_name]` or the provided script.
