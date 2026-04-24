@@ -111,14 +111,39 @@ export class DoctorCommand extends Command {
 	type: CommandType = 'local';
 
 	async execute(): Promise<CommandResult> {
+		const config = globalConfigManager.get();
+		const provider = config.provider;
 		const checks: { name: string; status: 'pass' | 'fail' | 'warn'; message: string }[] = [];
+
+		let apiKeySet = false;
+		let apiKeyName = '';
+
+		if (provider === 'anthropic') {
+			apiKeyName = 'ANTHROPIC_API_KEY';
+			apiKeySet = !!(config.apiKey || process.env.ANTHROPIC_API_KEY);
+		} else if (provider === 'openai') {
+			apiKeyName = 'OPENAI_API_KEY';
+			apiKeySet = !!(config.openaiApiKey || config.apiKey || process.env.OPENAI_API_KEY);
+		} else if (provider === 'google') {
+			apiKeyName = 'GOOGLE_API_KEY';
+			apiKeySet = !!(config.googleApiKey || config.apiKey || process.env.GOOGLE_API_KEY);
+		} else if (provider === 'ollama') {
+			apiKeyName = 'Ollama';
+			apiKeySet = true; // Ollama usually doesn't require a key
+		}
+
+		checks.push({
+			name: 'Provider',
+			status: 'pass',
+			message: `Current provider is ${provider}`,
+		});
 
 		checks.push({
 			name: 'API Key',
-			status: process.env.ANTHROPIC_API_KEY ? 'pass' : 'fail',
-			message: process.env.ANTHROPIC_API_KEY
-				? 'ANTHROPIC_API_KEY is set'
-				: 'ANTHROPIC_API_KEY not found in environment',
+			status: apiKeySet ? 'pass' : 'fail',
+			message: apiKeySet
+				? `${apiKeyName} is configured`
+				: `${apiKeyName} is not configured (provider: ${provider})`,
 		});
 
 		try {
@@ -167,17 +192,45 @@ export class ConfigCommand extends Command {
 		value: z.string().optional(),
 	});
 
-	private normalizeKey(input: string): 'model' | 'maxTokens' | 'temperature' | 'apiKey' | null {
-		const map: Record<string, 'model' | 'maxTokens' | 'temperature' | 'apiKey'> = {
+	private normalizeKey(
+		input: string,
+	):
+		| 'model'
+		| 'maxTokens'
+		| 'temperature'
+		| 'apiKey'
+		| 'googleApiKey'
+		| 'openaiApiKey'
+		| 'ollamaBaseUrl'
+		| 'provider'
+		| null {
+		const map: Record<
+			string,
+			| 'model'
+			| 'maxTokens'
+			| 'temperature'
+			| 'apiKey'
+			| 'googleApiKey'
+			| 'openaiApiKey'
+			| 'ollamaBaseUrl'
+			| 'provider'
+		> = {
 			model: 'model',
 			maxTokens: 'maxTokens',
 			max_tokens: 'maxTokens',
 			temperature: 'temperature',
 			apiKey: 'apiKey',
 			api_key: 'apiKey',
+			googleApiKey: 'googleApiKey',
+			google_api_key: 'googleApiKey',
+			openaiApiKey: 'openaiApiKey',
+			openai_api_key: 'openaiApiKey',
+			ollamaBaseUrl: 'ollamaBaseUrl',
+			ollama_url: 'ollamaBaseUrl',
+			provider: 'provider',
 		};
 
-		return map[input] || null;
+		return map[input] || (map[input.toLowerCase()] as any) || null;
 	}
 
 	async execute(args?: Record<string, unknown>): Promise<CommandResult> {
@@ -188,10 +241,14 @@ export class ConfigCommand extends Command {
 				type: 'text',
 				content: `Current Configuration:
 
+provider: ${config.provider}
 model: ${config.model}
 maxTokens: ${config.maxTokens}
 temperature: ${config.temperature}
 apiKey: ${config.apiKey ? '***set***' : 'not set'}
+googleApiKey: ${config.googleApiKey ? '***set***' : 'not set'}
+openaiApiKey: ${config.openaiApiKey ? '***set***' : 'not set'}
+ollamaBaseUrl: ${config.ollamaBaseUrl}
 
 To set a value: /config <key> <value>`,
 			};
@@ -203,16 +260,17 @@ To set a value: /config <key> <value>`,
 		if (!normalizedKey) {
 			return {
 				type: 'text',
-				content: `Unknown config key: ${key}\nSupported keys: model, maxTokens, temperature, apiKey`,
+				content: `Unknown config key: ${key}\nSupported keys: provider, model, maxTokens, temperature, apiKey, googleApiKey, openaiApiKey, ollamaBaseUrl`,
 			};
 		}
 
 		if (args.value === undefined) {
 			const allConfig = globalConfigManager.get();
 			const current = allConfig[normalizedKey];
+			const isKey = normalizedKey.toLowerCase().includes('apikey');
 			return {
 				type: 'text',
-				content: `${normalizedKey}: ${normalizedKey === 'apiKey' && current ? '***set***' : String(current)}`,
+				content: `${normalizedKey}: ${isKey && current ? '***set***' : String(current)}`,
 			};
 		}
 
@@ -235,26 +293,20 @@ To set a value: /config <key> <value>`,
 			}
 		}
 
-		switch (normalizedKey) {
-			case 'model':
-				globalConfigManager.set('model', String(parsedValue));
-				break;
-			case 'apiKey':
-				globalConfigManager.set('apiKey', String(parsedValue));
-				break;
-			case 'maxTokens':
-				globalConfigManager.set('maxTokens', Number(parsedValue));
-				break;
-			case 'temperature':
-				globalConfigManager.set('temperature', Number(parsedValue));
-				break;
+		if (normalizedKey === 'provider') {
+			const validProviders = ['anthropic', 'openai', 'google', 'ollama'];
+			if (!validProviders.includes(String(parsedValue))) {
+				throw new Error(`Invalid provider. Must be one of: ${validProviders.join(', ')}`);
+			}
 		}
 
+		globalConfigManager.set(normalizedKey as any, parsedValue);
 		globalConfigManager.save();
 
+		const isKey = normalizedKey.toLowerCase().includes('apikey');
 		return {
 			type: 'text',
-			content: `Saved ${normalizedKey} = ${normalizedKey === 'apiKey' ? '***set***' : String(parsedValue)}\nConfig path: ${ConfigManager.getDefaultConfigPath()}`,
+			content: `Saved ${normalizedKey} = ${isKey ? '***set***' : String(parsedValue)}\nConfig path: ${ConfigManager.getDefaultConfigPath()}`,
 		};
 	}
 }

@@ -151,6 +151,11 @@ export class QueryEngine extends EventEmitter {
 		let response = await this.executeRound(systemPrompt, tools, options);
 
 		while (this.shouldContinue(response, tools)) {
+			this.messageHistory.push({
+				role: 'assistant',
+				content: response,
+			});
+
 			this.currentIteration++;
 			if (this.currentIteration >= this.maxIterations) {
 				throw new Error('Max tool call iterations reached');
@@ -165,13 +170,12 @@ export class QueryEngine extends EventEmitter {
 			response = await this.executeRound(systemPrompt, tools, options);
 		}
 
-		const finalContent = this.extractTextContent(response);
 		this.messageHistory.push({
 			role: 'assistant',
-			content: finalContent,
+			content: response,
 		});
 
-		return finalContent;
+		return this.extractTextContent(response);
 	}
 
 	private getDefaultSystemPrompt(): string {
@@ -348,15 +352,18 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 			systemInstruction: systemPrompt,
 		});
 
-		const toolSchemas = tools.map((t) => ({
-			functionDeclarations: [
-				{
-					name: t.name,
-					description: t.description,
-					parameters: t.getSchema().input_schema,
-				},
-			],
-		}));
+		const toolSchemas =
+			tools.length > 0
+				? [
+						{
+							functionDeclarations: tools.map((t) => ({
+								name: t.name,
+								description: t.description,
+								parameters: t.getSchema().input_schema,
+							})),
+						},
+					]
+				: undefined;
 
 		const history = [];
 		for (let i = 0; i < this.messageHistory.length - 1; i++) {
@@ -392,13 +399,32 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 
 		const chat = model.startChat({
 			history,
-			tools: toolSchemas.length > 0 ? (toolSchemas as any) : undefined,
+			tools: toolSchemas as any,
 		});
 
-		const lastMessage = this.messageHistory[this.messageHistory.length - 1].content;
-		const result = await chat.sendMessage(
-			typeof lastMessage === 'string' ? lastMessage : JSON.stringify(lastMessage),
-		);
+		const lastMessageContent = this.messageHistory[this.messageHistory.length - 1].content;
+		let lastMessage: any;
+
+		if (Array.isArray(lastMessageContent)) {
+			lastMessage = lastMessageContent.map((block: any) => {
+				if (block.type === 'text') {
+					return { text: block.text };
+				}
+				if (block.type === 'tool_result') {
+					return {
+						functionResponse: {
+							name: block.name || '',
+							response: { content: block.content },
+						},
+					};
+				}
+				return { text: JSON.stringify(block) };
+			});
+		} else {
+			lastMessage = lastMessageContent;
+		}
+
+		const result = await chat.sendMessage(lastMessage);
 		const response = result.response;
 
 		const content: ReoContentBlock[] = [];
@@ -555,16 +581,121 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 			yield* this.streamAnthropic(systemPrompt, tools, options);
 		} else if (provider === 'openai' || provider === 'ollama') {
 			yield* this.streamOpenAI(systemPrompt, tools, options);
+		} else if (provider === 'google') {
+			yield* this.streamGoogle(systemPrompt, tools, options);
 		} else {
 			// Fallback to non-streaming for others
 			const response = await this.executeRound(systemPrompt, tools, options);
 			const text = this.extractTextContent(response);
 			this.messageHistory.push({
 				role: 'assistant',
-				content: text,
+				content: response,
 			});
 			yield text;
 		}
+	}
+
+	private async *streamGoogle(
+		systemPrompt: string,
+		tools: Tool[],
+		options: QueryOptions,
+	): AsyncGenerator<string> {
+		if (!this.googleClient) throw new Error('Google client not initialized');
+
+		const model = this.googleClient.getGenerativeModel({
+			model: this.config.model,
+			systemInstruction: systemPrompt,
+		});
+
+		const toolSchemas =
+			tools.length > 0
+				? [
+						{
+							functionDeclarations: tools.map((t) => ({
+								name: t.name,
+								description: t.description,
+								parameters: t.getSchema().input_schema,
+							})),
+						},
+					]
+				: undefined;
+
+		const history = [];
+		for (let i = 0; i < this.messageHistory.length - 1; i++) {
+			const m = this.messageHistory[i];
+			const role = m.role === 'user' ? 'user' : 'model';
+			const parts: any[] = [];
+
+			if (Array.isArray(m.content)) {
+				for (const block of m.content as any[]) {
+					if (block.type === 'text') {
+						parts.push({ text: block.text });
+					} else if (block.type === 'tool_use') {
+						parts.push({
+							functionCall: {
+								name: block.name,
+								args: block.input,
+							},
+						});
+					} else if (block.type === 'tool_result') {
+						parts.push({
+							functionResponse: {
+								name: block.name || '',
+								response: { content: block.content },
+							},
+						});
+					}
+				}
+			} else {
+				parts.push({ text: m.content });
+			}
+			history.push({ role, parts });
+		}
+
+		const chat = model.startChat({
+			history,
+			tools: toolSchemas as any,
+		});
+
+		const lastMessageContent = this.messageHistory[this.messageHistory.length - 1].content;
+		let lastMessage: any;
+
+		if (Array.isArray(lastMessageContent)) {
+			lastMessage = lastMessageContent.map((block: any) => {
+				if (block.type === 'text') {
+					return { text: block.text };
+				}
+				if (block.type === 'tool_result') {
+					return {
+						functionResponse: {
+							name: block.name || '',
+							response: { content: block.content },
+						},
+					};
+				}
+				return { text: JSON.stringify(block) };
+			});
+		} else {
+			lastMessage = lastMessageContent;
+		}
+
+		const result = await chat.sendMessageStream(lastMessage);
+
+		let fullResponse = '';
+		for await (const chunk of result.stream) {
+			const text = chunk.text();
+			if (text) {
+				fullResponse += text;
+				yield text;
+			}
+		}
+
+		this.messageHistory.push({
+			role: 'assistant',
+			content: [{ type: 'text', text: fullResponse }],
+		});
+
+		this.usageStats.apiCalls += 1;
 	}
 
 	private async *streamAnthropic(
