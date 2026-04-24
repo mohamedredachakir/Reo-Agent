@@ -3,8 +3,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Anthropic } from '@anthropic-ai/sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages/messages';
-import { OpenAI } from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OpenAI } from 'openai';
 import * as yaml from 'yaml';
 import type { Tool } from './Tool.js';
 
@@ -151,6 +151,11 @@ export class QueryEngine extends EventEmitter {
 		let response = await this.executeRound(systemPrompt, tools, options);
 
 		while (this.shouldContinue(response, tools)) {
+			this.messageHistory.push({
+				role: 'assistant',
+				content: response,
+			});
+
 			this.currentIteration++;
 			if (this.currentIteration >= this.maxIterations) {
 				throw new Error('Max tool call iterations reached');
@@ -165,13 +170,12 @@ export class QueryEngine extends EventEmitter {
 			response = await this.executeRound(systemPrompt, tools, options);
 		}
 
-		const finalContent = this.extractTextContent(response);
 		this.messageHistory.push({
 			role: 'assistant',
-			content: finalContent,
+			content: response,
 		});
 
-		return finalContent;
+		return this.extractTextContent(response);
 	}
 
 	private getDefaultSystemPrompt(): string {
@@ -197,9 +201,11 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 
 		if (provider === 'anthropic') {
 			return this.executeAnthropicRound(systemPrompt, tools, options);
-		} else if (provider === 'openai' || provider === 'ollama') {
+		}
+		if (provider === 'openai' || provider === 'ollama') {
 			return this.executeOpenAIRound(systemPrompt, tools, options);
-		} else if (provider === 'google') {
+		}
+		if (provider === 'google') {
 			return this.executeGoogleRound(systemPrompt, tools, options);
 		}
 
@@ -231,7 +237,7 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 		const responseWithUsage = response as typeof response & { usage?: ReoUsage };
 		this.recordUsage(responseWithUsage.usage);
 
-		return response.content as ReoContentBlock[];
+		return response.content as any[];
 	}
 
 	private async executeOpenAIRound(
@@ -242,7 +248,7 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 		if (!this.openaiClient) throw new Error('OpenAI client not initialized');
 
 		const toolSchemas = tools.map((t) => ({
-			type: 'function',
+			type: 'function' as const,
 			function: {
 				name: t.name,
 				description: t.description,
@@ -255,16 +261,27 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 		for (const m of this.messageHistory) {
 			if (m.role === 'assistant') {
 				// Search for tool calls in the content
-				const contentBlocks = Array.isArray(m.content) ? m.content : [{ type: 'text', text: m.content }];
+				const contentBlocks = Array.isArray(m.content)
+					? (m.content as any[])
+					: [{ type: 'text', text: m.content as string } as ReoContentBlock];
 				const text = contentBlocks
-					.filter((b: any) => b.type === 'text')
-					.map((b: any) => b.text)
+					.filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+					.map((b) => b.text)
 					.join('\n');
 				const tool_calls = contentBlocks
-					.filter((b: any) => b.type === 'tool_use')
-					.map((b: any) => ({
+					.filter(
+						(
+							b,
+						): b is {
+							type: 'tool_use';
+							id: string;
+							name: string;
+							input: Record<string, unknown>;
+						} => b.type === 'tool_use',
+					)
+					.map((b) => ({
 						id: b.id,
-						type: 'function',
+						type: 'function' as const,
 						function: {
 							name: b.name,
 							arguments: JSON.stringify(b.input),
@@ -278,24 +295,24 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 				});
 			} else if (m.role === 'user') {
 				if (Array.isArray(m.content)) {
-					const toolResults = m.content.filter((c: any) => c.type === 'tool_result');
+					const toolResults = (m.content as any[]).filter((c) => c.type === 'tool_result');
 					if (toolResults.length > 0) {
 						for (const result of toolResults) {
 							messages.push({
 								role: 'tool',
-								tool_call_id: (result as any).tool_use_id,
-								content: (result as any).content,
+								tool_call_id: result.tool_use_id,
+								content: result.content,
 							});
 						}
 					} else {
-						const text = m.content
-							.filter((c: any) => c.type === 'text')
-							.map((c: any) => c.text)
+						const text = (m.content as any[])
+							.filter((c) => c.type === 'text')
+							.map((c) => c.text)
 							.join('\n');
 						messages.push({ role: 'user', content: text });
 					}
 				} else {
-					messages.push({ role: 'user', content: m.content });
+					messages.push({ role: 'user', content: m.content as string });
 				}
 			}
 		}
@@ -305,7 +322,7 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 			max_tokens: options.maxTokens || this.config.maxTokens,
 			temperature: options.temperature ?? this.config.temperature,
 			messages,
-			tools: toolSchemas.length > 0 ? (toolSchemas as any) : undefined,
+			tools: toolSchemas.length > 0 ? toolSchemas : undefined,
 		});
 
 		this.recordUsage({
@@ -348,15 +365,18 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 			systemInstruction: systemPrompt,
 		});
 
-		const toolSchemas = tools.map((t) => ({
-			functionDeclarations: [
-				{
-					name: t.name,
-					description: t.description,
-					parameters: t.getSchema().input_schema,
-				},
-			],
-		}));
+		const toolSchemas =
+			tools.length > 0
+				? [
+						{
+							functionDeclarations: tools.map((t) => ({
+								name: t.name,
+								description: t.description,
+								parameters: t.getSchema().input_schema,
+							})),
+						},
+					]
+				: undefined;
 
 		const history = [];
 		for (let i = 0; i < this.messageHistory.length - 1; i++) {
@@ -392,12 +412,34 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 
 		const chat = model.startChat({
 			history,
-			tools: toolSchemas.length > 0 ? (toolSchemas as any) : undefined,
+			tools: toolSchemas as unknown as import('@google/generative-ai').Tool[],
 		});
 
-		const lastMessage = this.messageHistory[this.messageHistory.length - 1].content;
+		const lastMessageContent = this.messageHistory[this.messageHistory.length - 1].content;
+		let lastMessage: unknown;
+
+		if (Array.isArray(lastMessageContent)) {
+			lastMessage = lastMessageContent.map((block: any) => {
+				const b = block as any;
+				if (b.type === 'text') {
+					return { text: b.text };
+				}
+				if (b.type === 'tool_result') {
+					return {
+						functionResponse: {
+							name: b.name || '',
+							response: { content: b.content },
+						},
+					};
+				}
+				return { text: JSON.stringify(b) };
+			});
+		} else {
+			lastMessage = lastMessageContent;
+		}
+
 		const result = await chat.sendMessage(
-			typeof lastMessage === 'string' ? lastMessage : JSON.stringify(lastMessage),
+			lastMessage as string | (string | import('@google/generative-ai').Part)[],
 		);
 		const response = result.response;
 
@@ -471,12 +513,12 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 
 				try {
 					this.emit('toolCallStart', { tool: toolName, input: toolUse.input });
-					const output = await tool.execute(toolUse.input as Record<string, unknown>);
+					const output = await tool.execute(toolUse.input as any);
 					this.emit('toolCallEnd', { tool: toolName, output });
 
 					this.toolCallHistory.push({
 						tool: toolName,
-						input: toolUse.input as Record<string, unknown>,
+						input: toolUse.input as any,
 						output,
 						success: true,
 					});
@@ -493,7 +535,7 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 
 					this.toolCallHistory.push({
 						tool: toolName,
-						input: toolUse.input as Record<string, unknown>,
+						input: toolUse.input as any,
 						output: new Error(errorMessage),
 						success: false,
 					});
@@ -555,16 +597,125 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 			yield* this.streamAnthropic(systemPrompt, tools, options);
 		} else if (provider === 'openai' || provider === 'ollama') {
 			yield* this.streamOpenAI(systemPrompt, tools, options);
+		}
+		if (provider === 'google') {
+			yield* this.streamGoogle(systemPrompt, tools, options);
 		} else {
 			// Fallback to non-streaming for others
 			const response = await this.executeRound(systemPrompt, tools, options);
 			const text = this.extractTextContent(response);
 			this.messageHistory.push({
 				role: 'assistant',
-				content: text,
+				content: response,
 			});
 			yield text;
 		}
+	}
+
+	private async *streamGoogle(
+		systemPrompt: string,
+		tools: Tool[],
+		options: QueryOptions,
+	): AsyncGenerator<string> {
+		if (!this.googleClient) throw new Error('Google client not initialized');
+
+		const model = this.googleClient.getGenerativeModel({
+			model: this.config.model,
+			systemInstruction: systemPrompt,
+		});
+
+		const toolSchemas =
+			tools.length > 0
+				? [
+						{
+							functionDeclarations: tools.map((t) => ({
+								name: t.name,
+								description: t.description,
+								parameters: t.getSchema().input_schema,
+							})),
+						},
+					]
+				: undefined;
+
+		const history = [];
+		for (let i = 0; i < this.messageHistory.length - 1; i++) {
+			const m = this.messageHistory[i];
+			const role = m.role === 'user' ? 'user' : 'model';
+			const parts: any[] = [];
+
+			if (Array.isArray(m.content)) {
+				for (const block of m.content as any[]) {
+					if (block.type === 'text') {
+						parts.push({ text: block.text });
+					} else if (block.type === 'tool_use') {
+						parts.push({
+							functionCall: {
+								name: block.name,
+								args: block.input,
+							},
+						});
+					} else if (block.type === 'tool_result') {
+						parts.push({
+							functionResponse: {
+								name: block.name || '',
+								response: { content: block.content },
+							},
+						});
+					}
+				}
+			} else {
+				parts.push({ text: m.content });
+			}
+			history.push({ role, parts });
+		}
+
+		const chat = model.startChat({
+			history,
+			tools: toolSchemas as unknown as import('@google/generative-ai').Tool[],
+		});
+
+		const lastMessageContent = this.messageHistory[this.messageHistory.length - 1].content;
+		let lastMessage: unknown;
+
+		if (Array.isArray(lastMessageContent)) {
+			lastMessage = lastMessageContent.map((block: any) => {
+				const b = block as any;
+				if (b.type === 'text') {
+					return { text: b.text };
+				}
+				if (b.type === 'tool_result') {
+					return {
+						functionResponse: {
+							name: b.name || '',
+							response: { content: block.content },
+						},
+					};
+				}
+				return { text: JSON.stringify(b) };
+			});
+		} else {
+			lastMessage = lastMessageContent;
+		}
+
+		const result = await chat.sendMessageStream(
+			lastMessage as string | (string | import('@google/generative-ai').Part)[],
+		);
+
+		let fullResponse = '';
+		for await (const chunk of result.stream) {
+			const text = chunk.text();
+			if (text) {
+				fullResponse += text;
+				yield text;
+			}
+		}
+
+		this.messageHistory.push({
+			role: 'assistant',
+			content: [{ type: 'text', text: fullResponse }],
+		});
+
+		this.usageStats.apiCalls += 1;
 	}
 
 	private async *streamAnthropic(
