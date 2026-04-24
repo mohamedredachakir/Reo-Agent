@@ -17,7 +17,11 @@ program
 program
 	.option('-m, --message <message>', 'Initial message to send to Reo')
 	.option('--no-stream', 'Disable streaming responses')
-	.option('--provider <provider>', 'Provider to use (anthropic, openai, google, ollama)', 'anthropic')
+	.option(
+		'--provider <provider>',
+		'Provider to use (anthropic, openai, google, ollama)',
+		'anthropic',
+	)
 	.option('--model <model>', 'Model to use')
 	.option('--ollama-url <url>', 'Ollama base URL', 'http://localhost:11434')
 	.option('--max-tokens <number>', 'Maximum tokens in response')

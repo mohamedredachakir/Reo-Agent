@@ -21,13 +21,13 @@ export abstract class Tool {
 		return {
 			name: this.name,
 			description: this.description,
-			input_schema: this.zodToJSONSchema(this.inputSchema),
+			input_schema: this.zodToJSONSchema(this.inputSchema) as any,
 		};
 	}
 
-	private zodToJSONSchema(schema: z.ZodTypeAny): any {
+	private zodToJSONSchema(schema: z.ZodTypeAny): unknown {
 		if (schema instanceof z.ZodObject) {
-			const properties: Record<string, any> = {};
+			const properties: any = {};
 			const required: string[] = [];
 			const shape = schema.shape;
 

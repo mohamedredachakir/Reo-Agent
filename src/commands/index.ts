@@ -230,7 +230,7 @@ export class ConfigCommand extends Command {
 			provider: 'provider',
 		};
 
-		return map[input] || (map[input.toLowerCase()] as any) || null;
+		return map[input] || map[input.toLowerCase()] || null;
 	}
 
 	async execute(args?: Record<string, unknown>): Promise<CommandResult> {
@@ -300,7 +300,7 @@ To set a value: /config <key> <value>`,
 			}
 		}
 
-		globalConfigManager.set(normalizedKey as any, parsedValue);
+		globalConfigManager.set(normalizedKey, parsedValue);
 		globalConfigManager.save();
 
 		const isKey = normalizedKey.toLowerCase().includes('apikey');
