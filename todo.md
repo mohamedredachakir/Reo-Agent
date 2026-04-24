@@ -39,7 +39,7 @@ Project status is **MVP / in progress**. Core functionality exists, but it is **
   - Example: header/version values should come from package version everywhere.
   - Done when: no hardcoded stale version strings in UI/commands.
 
-- [ ] Strengthen error handling and user feedback
+- [x] Strengthen error handling and user feedback
   - Normalize command/tool errors and exit codes.
   - Done when: errors are actionable and consistent for users.
 
@@ -48,10 +48,10 @@ Project status is **MVP / in progress**. Core functionality exists, but it is **
 - [x] Add unit tests for core modules
   - Priority modules: `QueryEngine`, command parsing, tool registry, file tools.
 
-- [ ] Add integration tests for CLI workflows
+- [x] Add integration tests for CLI workflows
   - Cases: slash commands, streaming mode, tool call loops, malformed input.
 
-- [ ] Add regression tests for known issues
+- [x] Add regression tests for known issues
   - First regression: ANSI escape compile failure in main CLI.
 
 - [x] Add CI pipeline gates
@@ -66,7 +66,7 @@ Project status is **MVP / in progress**. Core functionality exists, but it is **
 - [x] Expand [docs/index.md](docs/index.md)
   - Add practical usage flows, command examples, and troubleshooting.
 
-- [ ] Keep README aligned with real implementation status
+- [x] Keep README aligned with real implementation status
   - Mark experimental features clearly and avoid overpromising.
 
 ## 6) Release-readiness criteria

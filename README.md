@@ -38,11 +38,19 @@ export GOOGLE_API_KEY="your-key"
 ```
 
 #### Option B: Configuration File
-Create `~/.config/reo-agent/config.yaml`:
+You can set configuration via the CLI:
+```bash
+reo /config provider google
+reo /config googleApiKey your-key
+reo /config model gemini-1.5-flash
+```
+
+Or manually edit `~/.config/reo-agent/config.yaml`:
 ```yaml
 provider: google # anthropic, openai, google, or ollama
-apiKey: your-primary-key
 googleApiKey: your-google-key
+openaiApiKey: your-openai-key
+apiKey: your-anthropic-key
 model: gemini-1.5-flash
 ```
 

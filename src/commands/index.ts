@@ -86,13 +86,34 @@ export class CostCommand extends Command {
 			apiCalls: 0,
 		};
 
+		const config = globalConfigManager.get();
+		const provider = config.provider;
 		const totalTokens = usage.inputTokens + usage.outputTokens;
+
+		let inputRate = 3.0; // Per 1M tokens
+		let outputRate = 15.0; // Per 1M tokens
+		let pricingNote = 'default Sonnet pricing assumptions';
+
+		if (provider === 'openai') {
+			inputRate = 2.5; // GPT-4o
+			outputRate = 10.0;
+			pricingNote = 'GPT-4o pricing assumptions';
+		} else if (provider === 'google') {
+			inputRate = 0.075; // Gemini 1.5 Flash (under 128k context)
+			outputRate = 0.3;
+			pricingNote = 'Gemini 1.5 Flash pricing assumptions';
+		} else if (provider === 'ollama') {
+			inputRate = 0;
+			outputRate = 0;
+			pricingNote = 'local models (free)';
+		}
+
 		const estimatedCostUsd =
-			(usage.inputTokens / 1_000_000) * 3 + (usage.outputTokens / 1_000_000) * 15;
+			(usage.inputTokens / 1_000_000) * inputRate + (usage.outputTokens / 1_000_000) * outputRate;
 
 		return {
 			type: 'text',
-			content: `API Cost Tracking
+			content: `API Cost Tracking (${provider})
 
 Input tokens: ${usage.inputTokens}
 Output tokens: ${usage.outputTokens}
@@ -100,7 +121,7 @@ Total tokens: ${totalTokens}
 API calls: ${usage.apiCalls}
 Estimated cost: $${estimatedCostUsd.toFixed(6)}
 
-Estimated using default Sonnet pricing assumptions.`,
+Estimated using ${pricingNote}.`,
 		};
 	}
 }
