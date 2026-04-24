@@ -363,6 +363,10 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 		const model = this.googleClient.getGenerativeModel({
 			model: this.config.model,
 			systemInstruction: systemPrompt,
+			generationConfig: {
+				maxOutputTokens: options.maxTokens || this.config.maxTokens,
+				temperature: options.temperature ?? this.config.temperature,
+			},
 		});
 
 		const toolSchemas =
@@ -622,6 +626,10 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 		const model = this.googleClient.getGenerativeModel({
 			model: this.config.model,
 			systemInstruction: systemPrompt,
+			generationConfig: {
+				maxOutputTokens: options.maxTokens || this.config.maxTokens,
+				temperature: options.temperature ?? this.config.temperature,
+			},
 		});
 
 		const toolSchemas =
