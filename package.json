@@ -34,7 +34,7 @@
 		"ora": "^8.1.0",
 		"react": "^19.0.0",
 		"react-devtools-core": "^7.0.1",
-		"react-reconciler": "^0.31.0",
+		"react-reconciler": "^0.33.0",
 		"yaml": "^2.6.0",
 		"zod": "^3.24.0"
 	},
