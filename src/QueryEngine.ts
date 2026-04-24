@@ -601,8 +601,7 @@ You are helpful, concise, and focused on writing correct, maintainable code.`;
 			yield* this.streamAnthropic(systemPrompt, tools, options);
 		} else if (provider === 'openai' || provider === 'ollama') {
 			yield* this.streamOpenAI(systemPrompt, tools, options);
-		}
-		if (provider === 'google') {
+		} else if (provider === 'google') {
 			yield* this.streamGoogle(systemPrompt, tools, options);
 		} else {
 			// Fallback to non-streaming for others

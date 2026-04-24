@@ -7,7 +7,18 @@ describe('ToolRegistry', () => {
 		const tools = registry.getAll();
 		const names = tools.map((tool) => tool.name);
 
-		expect(names).toEqual(['read', 'write', 'edit', 'bash', 'glob', 'grep', 'web_fetch']);
+		expect(names).toEqual([
+			'read',
+			'write',
+			'edit',
+			'bash',
+			'glob',
+			'grep',
+			'list_dir',
+			'delete_file',
+			'move_file',
+			'web_fetch',
+		]);
 		expect(new Set(names).size).toBe(names.length);
 	});
 

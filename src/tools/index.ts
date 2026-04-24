@@ -1,6 +1,15 @@
 import type { Tool } from '../Tool.js';
 import { BashTool, WebFetchTool } from './BashTools.js';
-import { FileEditTool, FileReadTool, FileWriteTool, GlobTool, GrepTool } from './FileTools.js';
+import {
+	DeleteFileTool,
+	FileEditTool,
+	FileReadTool,
+	FileWriteTool,
+	GlobTool,
+	GrepTool,
+	ListDirectoryTool,
+	MoveFileTool,
+} from './FileTools.js';
 
 export class ToolRegistry {
 	private tools: Map<string, Tool> = new Map();
@@ -11,6 +20,9 @@ export class ToolRegistry {
 		new BashTool(),
 		new GlobTool(),
 		new GrepTool(),
+		new ListDirectoryTool(),
+		new DeleteFileTool(),
+		new MoveFileTool(),
 		new WebFetchTool(),
 	];
 

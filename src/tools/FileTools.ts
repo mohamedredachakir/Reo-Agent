@@ -221,19 +221,105 @@ export class GrepTool extends Tool {
 		args.push(pattern as string);
 		args.push((searchPath as string) || '.');
 
-		return new Promise((resolve, reject) => {
-			const { execa } = require('execa');
-			execa('rg', args, { reject: false })
-				.then((result: { stdout: string }) => {
-					resolve(result.stdout || 'No matches found');
-				})
-				.catch((e: { exitCode?: number; message: string }) => {
-					if (e.exitCode === 1) {
-						resolve('No matches found');
-					} else {
-						reject(new Error(`Grep failed: ${e.message}`));
-					}
-				});
-		});
+		try {
+			const { execa } = await import('execa');
+			const result = await execa('rg', args, { reject: false });
+			if (result.exitCode === 1) {
+				return 'No matches found';
+			}
+			return result.stdout || 'No matches found';
+		} catch (e) {
+			throw new Error(`Grep failed: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+}
+
+export class ListDirectoryTool extends Tool {
+	name = 'list_dir';
+	description = 'List the contents of a directory.';
+
+	inputSchema = z.object({
+		path: z.string().optional().describe('The directory to list (defaults to current directory)'),
+	});
+
+	async execute(input: Record<string, unknown>): Promise<string> {
+		const dirPath = (input.path as string) || process.cwd();
+
+		if (!fs.existsSync(dirPath)) {
+			throw new Error(`Directory not found: ${dirPath}`);
+		}
+
+		if (!fs.statSync(dirPath).isDirectory()) {
+			throw new Error(`Path is not a directory: ${dirPath}`);
+		}
+
+		try {
+			const files = fs.readdirSync(dirPath);
+			const details = files.map((file) => {
+				const fullPath = path.join(dirPath, file);
+				const isDir = fs.statSync(fullPath).isDirectory();
+				return `${isDir ? '[DIR] ' : '      '}${file}`;
+			});
+
+			return details.length > 0 ? details.join('\n') : 'Directory is empty';
+		} catch (e) {
+			throw new Error(`Failed to list directory: ${this.formatError(e)}`);
+		}
+	}
+}
+
+export class DeleteFileTool extends Tool {
+	name = 'delete_file';
+	description = 'Delete a file or directory.';
+
+	inputSchema = z.object({
+		path: z.string().describe('The path to the file or directory to delete'),
+		recursive: z.boolean().optional().default(false).describe('Whether to delete recursively'),
+	});
+
+	async execute(input: Record<string, unknown>): Promise<string> {
+		const targetPath = input.path as string;
+		const recursive = !!input.recursive;
+
+		if (!fs.existsSync(targetPath)) {
+			throw new Error(`Path not found: ${targetPath}`);
+		}
+
+		try {
+			fs.rmSync(targetPath, { recursive, force: true });
+			return `Successfully deleted ${targetPath}`;
+		} catch (e) {
+			throw new Error(`Failed to delete: ${this.formatError(e)}`);
+		}
+	}
+}
+
+export class MoveFileTool extends Tool {
+	name = 'move_file';
+	description = 'Move or rename a file or directory.';
+
+	inputSchema = z.object({
+		source: z.string().describe('The current path of the file or directory'),
+		destination: z.string().describe('The new path for the file or directory'),
+	});
+
+	async execute(input: Record<string, unknown>): Promise<string> {
+		const source = input.source as string;
+		const destination = input.destination as string;
+
+		if (!fs.existsSync(source)) {
+			throw new Error(`Source not found: ${source}`);
+		}
+
+		try {
+			const destDir = path.dirname(destination);
+			if (!fs.existsSync(destDir)) {
+				fs.mkdirSync(destDir, { recursive: true });
+			}
+			fs.renameSync(source, destination);
+			return `Successfully moved ${source} to ${destination}`;
+		} catch (e) {
+			throw new Error(`Failed to move: ${this.formatError(e)}`);
+		}
 	}
 }
