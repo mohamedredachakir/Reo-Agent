@@ -23,7 +23,7 @@
 		"@modelcontextprotocol/sdk": "^1.0.0",
 		"chalk": "^5.4.0",
 		"chokidar": "^4.0.0",
-		"commander": "^12.1.0",
+		"commander": "^14.0.3",
 		"diff": "^7.0.0",
 		"execa": "^9.5.0",
 		"fuse.js": "^7.0.0",
